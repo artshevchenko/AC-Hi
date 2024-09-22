@@ -115,7 +115,10 @@ void ACHi::send_read_command() {
 void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
   // Manual debug
   for (int val = 0; val < bytes.size(); val++) {
-    ESP_LOGD("ACHi", "BYTE %s: val %s", to_string(val).c_str(), to_string(bytes[val]).c_str());
+    ESP_LOGD("ACHi", "Status CRC: %s", this->status_crc_);
+    if (bytes[val] != 0) {
+      ESP_LOGD("ACHi", "BYTE %s: val %s", to_string(val).c_str(), to_string(bytes[val]).c_str());
+    }
   }
   if (bytes.size() > 20 && bytes[0] == 0xF4 && bytes[1] == 0xF5) {
     // Parse status message from AC commands 102 and 101
