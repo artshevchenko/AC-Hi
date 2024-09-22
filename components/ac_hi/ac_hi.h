@@ -16,7 +16,7 @@
 namespace esphome {
 namespace ac_hi {
 
-class ACHi : public PollingComponent, public UARTDevice {
+class ACHi : public PollingComponent, public uart::UARTDevice {
  public:
   ACHi(UARTComponent *parent);
 
@@ -110,6 +110,7 @@ class ACHi : public PollingComponent, public UARTDevice {
 
   // Timer for periodic actions
   uint32_t last_write_time_;
+  uint32_t last_read_time_;
 
   // Other necessary variables
   int status_crc_;
