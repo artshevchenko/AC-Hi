@@ -4,12 +4,13 @@
 namespace esphome {
 namespace ac_hi {
 
-class ACHi : public Component, public UARTDevice {
+class ACHi : public PollingComponent, public UARTDevice {
  public:
   ACHi(UARTComponent *parent);
 
   void setup() override;
   void loop() override;
+  void update() override;
 
   // Control methods
   void set_power(bool power);

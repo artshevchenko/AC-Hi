@@ -108,6 +108,10 @@ void ACHi::setup() {
   this->climate_device->setup();
 }
 
+void ACHi::update() {
+  this->loop();
+}
+
 void ACHi::loop() {
   uint32_t now = millis();
 
