@@ -7,7 +7,7 @@ DEPENDENCIES = ['uart']
 AUTO_LOAD = ['sensor', 'text_sensor', 'number', 'select', 'switch', 'climate']
 
 ac_hi_ns = cg.esphome_ns.namespace('ac_hi')
-ACHi = ac_hi_ns.class_('ACHi', cg.Component, uart.UARTDevice)
+ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(ACHi),
