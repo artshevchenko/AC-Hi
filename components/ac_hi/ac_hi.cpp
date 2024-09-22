@@ -38,12 +38,6 @@ ACHi::ACHi(uart::UARTComponent *parent) : PollingComponent(1000), uart::UARTDevi
   led_switch = nullptr;
   swing_up_down_switch = nullptr;
   swing_left_right_switch = nullptr;
-
-  climate_device = new ACHiClimate;
-  climate_device->set_name("AC");
-  climate_device->add_on_state_callback([this](climate::ClimateCall &call) {
-    this->on_climate_call(call);
-  });
 }
 
 void ACHi::setup() {
@@ -74,9 +68,6 @@ void ACHi::setup() {
   this->status_crc_ = 0;
 
   this->pending_write_ = false;
-
-  // Register the climate device
-  App.register_component(climate_device);
 }
 
 void ACHi::update() {
@@ -143,10 +134,6 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
             this->power_status->publish_state(power_status ? "ON" : "OFF");
           if (this->power_switch != nullptr)
             this->power_switch->publish_state(power_status);
-          if (this->climate_device != nullptr) {
-            this->climate_device->mode = power_status ? climate::CLIMATE_MODE_AUTO : climate::CLIMATE_MODE_OFF;
-            this->climate_device->publish_state();
-          }
         }
 
         // Parse current wind
@@ -157,18 +144,6 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
             this->sensor_wind->publish_state(bytes[16]);
           if (this->ac_wind_select != nullptr)
             this->ac_wind_select->publish_state(wind);
-          if (this->climate_device != nullptr) {
-            // Map wind to fan mode
-            if (wind == "lowest")
-              this->climate_device->fan_mode = climate::CLIMATE_FAN_LOW;
-            else if (wind == "medium")
-              this->climate_device->fan_mode = climate::CLIMATE_FAN_MEDIUM;
-            else if (wind == "highest")
-              this->climate_device->fan_mode = climate::CLIMATE_FAN_HIGH;
-            else
-              this->climate_device->fan_mode = climate::CLIMATE_FAN_AUTO;
-            this->climate_device->publish_state();
-          }
         }
 
         // Parse current sleep mode
@@ -189,20 +164,6 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
             this->sensor_mode->publish_state(bytes[18] >> 4);
           if (this->ac_mode_select != nullptr)
             this->ac_mode_select->publish_state(ac_mode);
-          if (this->climate_device != nullptr) {
-            // Map ac_mode to climate mode
-            if (ac_mode == "cool")
-              this->climate_device->mode = climate::CLIMATE_MODE_COOL;
-            else if (ac_mode == "heat")
-              this->climate_device->mode = climate::CLIMATE_MODE_HEAT;
-            else if (ac_mode == "fan_only")
-              this->climate_device->mode = climate::CLIMATE_MODE_FAN_ONLY;
-            else if (ac_mode == "dry")
-              this->climate_device->mode = climate::CLIMATE_MODE_DRY;
-            else
-              this->climate_device->mode = climate::CLIMATE_MODE_AUTO;
-            this->climate_device->publish_state();
-          }
         }
 
         // Parse current set temperature
@@ -212,19 +173,11 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
             this->temp_set->publish_state(bytes[19]);
           if (this->my_temperature != nullptr)
             this->my_temperature->publish_state(bytes[19]);
-          if (this->climate_device != nullptr) {
-            this->climate_device->target_temperature = bytes[19];
-            this->climate_device->publish_state();
-          }
         }
 
         // Update other sensors
         if (this->temp_current != nullptr)
           this->temp_current->publish_state(bytes[20]);
-        if (this->climate_device != nullptr) {
-          this->climate_device->current_temperature = bytes[20];
-          this->climate_device->publish_state();
-        }
         if (this->temp_pipe_current != nullptr)
           this->temp_pipe_current->publish_state(bytes[21]);
         if (this->compr_freq_set != nullptr)
@@ -279,19 +232,6 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
             this->sensor_left_right->publish_state(swing_lr);
           if (this->swing_left_right_switch != nullptr)
             this->swing_left_right_switch->publish_state(swing_lr);
-
-          // Update climate swing mode
-          if (this->climate_device != nullptr) {
-            if (swing_ud && swing_lr)
-              this->climate_device->swing_mode = climate::CLIMATE_SWING_BOTH;
-            else if (swing_ud)
-              this->climate_device->swing_mode = climate::CLIMATE_SWING_VERTICAL;
-            else if (swing_lr)
-              this->climate_device->swing_mode = climate::CLIMATE_SWING_HORIZONTAL;
-            else
-              this->climate_device->swing_mode = climate::CLIMATE_SWING_OFF;
-            this->climate_device->publish_state();
-          }
         }
       }
     }
@@ -488,29 +428,6 @@ void ACHi::set_swing_left_right(bool swing) {
   ESP_LOGD("ACHi", "Swing Left/Right set to %s", swing ? "ON" : "OFF");
 }
 
-climate::ClimateTraits ACHiClimate::traits() override {
-  auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(true);
-  traits.set_supported_modes({
-      climate::CLIMATE_MODE_OFF,
-      climate::CLIMATE_MODE_COOL,
-      climate::CLIMATE_MODE_HEAT,
-      climate::CLIMATE_MODE_FAN_ONLY,
-      climate::CLIMATE_MODE_DRY,
-      climate::CLIMATE_MODE_AUTO,
-  });
-  traits.set_supported_fan_modes({
-      climate::CLIMATE_FAN_AUTO,
-      climate::CLIMATE_FAN_LOW,
-      climate::CLIMATE_FAN_MEDIUM,
-      climate::CLIMATE_FAN_HIGH,
-  });
-  traits.set_visual_min_temperature(16);
-  traits.set_visual_max_temperature(30);
-  traits.set_visual_temperature_step(1);
-  return traits;
-}
-
 void ACHiClimate::control(const climate::ClimateCall &call) {
   if (call.get_mode().has_value()) {
     // User changed the mode
@@ -534,92 +451,6 @@ void ACHiClimate::control(const climate::ClimateCall &call) {
 
   this->publish_state();
 }
-
-}  // namespace ac_hi
-}  // namespace esphome
-
-void ACHi::on_climate_call(climate::ClimateCall &call) {
-  if (call.get_mode().has_value()) {
-    auto mode = *call.get_mode();
-    switch (mode) {
-      case climate::CLIMATE_MODE_COOL:
-        set_power(true);
-        set_mode("cool");
-        break;
-      case climate::CLIMATE_MODE_HEAT:
-        set_power(true);
-        set_mode("heat");
-        break;
-      case climate::CLIMATE_MODE_FAN_ONLY:
-        set_power(true);
-        set_mode("fan_only");
-        break;
-      case climate::CLIMATE_MODE_DRY:
-        set_power(true);
-        set_mode("dry");
-        break;
-      case climate::CLIMATE_MODE_AUTO:
-        set_power(true);
-        set_mode("auto");
-        break;
-      case climate::CLIMATE_MODE_OFF:
-        set_power(false);
-        break;
-      default:
-        break;
-    }
-  }
-
-  if (call.get_target_temperature().has_value()) {
-    float temp = *call.get_target_temperature();
-    set_temperature(temp);
-  }
-
-  if (call.get_fan_mode().has_value()) {
-    auto fan_mode = *call.get_fan_mode();
-    switch (fan_mode) {
-      case climate::CLIMATE_FAN_LOW:
-        set_fan_speed("lowest");
-        break;
-      case climate::CLIMATE_FAN_MEDIUM:
-        set_fan_speed("medium");
-        break;
-      case climate::CLIMATE_FAN_HIGH:
-        set_fan_speed("highest");
-        break;
-      case climate::CLIMATE_FAN_AUTO:
-        set_fan_speed("auto");
-        break;
-      default:
-        break;
-    }
-  }
-
-  if (call.get_swing_mode().has_value()) {
-    auto swing_mode = *call.get_swing_mode();
-    switch (swing_mode) {
-      case climate::CLIMATE_SWING_OFF:
-        set_swing_up_down(false);
-        set_swing_left_right(false);
-        break;
-      case climate::CLIMATE_SWING_VERTICAL:
-        set_swing_up_down(true);
-        set_swing_left_right(false);
-        break;
-      case climate::CLIMATE_SWING_HORIZONTAL:
-        set_swing_up_down(false);
-        set_swing_left_right(true);
-        break;
-      case climate::CLIMATE_SWING_BOTH:
-        set_swing_up_down(true);
-        set_swing_left_right(true);
-        break;
-      default:
-        break;
-    }
-  }
-}
-
 
 }  // namespace ac_hi
 }  // namespace esphome

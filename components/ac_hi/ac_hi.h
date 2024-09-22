@@ -18,21 +18,6 @@ namespace ac_hi {
 
 class ACHi;
 
-class ACHiClimate : public climate::Climate {
- public:
-  ACHiClimate(ACHi *parent) : parent_(parent) {}
-
-  // Override the traits method
-  climate::ClimateTraits traits() override;
-
-  // Override the control method
-  void control(const climate::ClimateCall &call) override;
-
- private:
-  // Reference to the parent ACHi component
-  ACHi *parent_;
-};
-
 class ACHi : public PollingComponent, public uart::UARTDevice {
  public:
   ACHi(uart::UARTComponent *parent);
@@ -91,11 +76,6 @@ class ACHi : public PollingComponent, public uart::UARTDevice {
   switch_::Switch *led_switch;
   switch_::Switch *swing_up_down_switch;
   switch_::Switch *swing_left_right_switch;
-
-  // Climate
-  ACHiClimate *climate_device;
-
-  void on_climate_call(climate::ClimateCall &call);
 
  private:
   // Variables previously defined as globals
