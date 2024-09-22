@@ -130,7 +130,7 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         crc += bytes[i];
       }
       ESP_LOGD("ACHi", "Status CRC New: %s", to_string(crc).c_str());
-      if (crc != this->status_crc_ && bytes[45] < 127) {
+      if (crc != this->status_crc_ ) { //&& bytes[45] < 127
         this->status_crc_ = crc;
         ESP_LOGD("ACHi", "Ok");
         // Parse power status
