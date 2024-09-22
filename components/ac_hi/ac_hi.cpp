@@ -167,10 +167,10 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         std::string ac_mode = this->decode_acmode_codes_[bytes[18] >> 4];
         if (this->current_ac_mode_ != ac_mode) {
           this->current_ac_mode_ = ac_mode;
-          if (this->sensor_mode != nullptr)
-            this->sensor_mode->publish_state(bytes[18] >> 4);
-          if (this->ac_mode_select != nullptr)
-            this->ac_mode_select->publish_state(ac_mode);
+          //if (this->sensor_mode != nullptr)
+          this->sensor_mode->publish_state(bytes[18] >> 4);
+          //if (this->ac_mode_select != nullptr)
+          this->ac_mode_select->publish_state(ac_mode);
         }
 
         // Parse current set temperature
