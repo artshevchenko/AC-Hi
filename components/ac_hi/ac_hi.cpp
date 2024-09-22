@@ -75,35 +75,7 @@ void ACHi::setup() {
   this->status_crc_ = 0;
 
   this->pending_write_ = false;
-
-  if (climate_device != nullptr) {
-    auto traits = climate::ClimateTraits();
-    traits.set_supports_current_temperature(true);
-    traits.set_visual_min_temperature(16.0f);
-    traits.set_visual_max_temperature(30.0f);
-    traits.set_visual_temperature_step(1.0f);
-    traits.set_supported_modes({
-      climate::CLIMATE_MODE_COOL,
-      climate::CLIMATE_MODE_HEAT,
-      climate::CLIMATE_MODE_FAN_ONLY,
-      climate::CLIMATE_MODE_DRY,
-      climate::CLIMATE_MODE_AUTO,
-      climate::CLIMATE_MODE_OFF
-    });
-    traits.set_supported_fan_modes({
-      climate::CLIMATE_FAN_LOW,
-      climate::CLIMATE_FAN_MEDIUM,
-      climate::CLIMATE_FAN_HIGH,
-      climate::CLIMATE_FAN_AUTO
-    });
-    traits.set_supported_swing_modes({
-      climate::CLIMATE_SWING_OFF,
-      climate::CLIMATE_SWING_VERTICAL,
-      climate::CLIMATE_SWING_HORIZONTAL,
-      climate::CLIMATE_SWING_BOTH
-    });
-    climate_device->set_traits(traits);
-  }
+  
   // Register the climate device
   App.register_component(climate_device);
 }
@@ -517,7 +489,7 @@ void ACHi::set_swing_left_right(bool swing) {
   ESP_LOGD("ACHi", "Swing Left/Right set to %s", swing ? "ON" : "OFF");
 }
 
-climate::ClimateTraits ACHiClimate::traits() {
+climate::ClimateTraits ACHiClimate::traits() override {
   auto traits = climate::ClimateTraits();
   traits.set_supports_current_temperature(true);
   traits.set_supported_modes({
