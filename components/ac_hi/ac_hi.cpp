@@ -114,8 +114,8 @@ void ACHi::send_read_command() {
 // Process incoming UART data from the AC unit
 void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
   // Manual debug
+  ESP_LOGD("ACHi", "Status CRC: %s", to_string(this->status_crc_).c_str());
   for (int val = 0; val < bytes.size(); val++) {
-    ESP_LOGD("ACHi", "Status CRC: %s", this->status_crc_);
     if (bytes[val] != 0) {
       ESP_LOGD("ACHi", "BYTE %s: val %s", to_string(val).c_str(), to_string(bytes[val]).c_str());
     }
