@@ -104,8 +104,8 @@ void ACHi::setup() {
     });
     climate_device->set_traits(traits);
   }
-  // Register climate device
-  this->climate_device->setup();
+  // Register the climate device
+  App.register_component(climate_device);
 }
 
 void ACHi::update() {
@@ -436,7 +436,7 @@ void ACHi::set_temperature(float temperature) {
   }
 }
 
-void ACHi::set_mode(const std::string &mode) {
+void ACHi::set_mode(const climate::ClimateMode &mode) {
   auto it = std::find(std::begin(this->decode_acmode_codes_), std::end(this->decode_acmode_codes_), mode);
   if (it != std::end(this->decode_acmode_codes_)) {
     uint8_t index = std::distance(this->decode_acmode_codes_, it);
@@ -447,7 +447,7 @@ void ACHi::set_mode(const std::string &mode) {
   }
 }
 
-void ACHi::set_fan_speed(const std::string &speed) {
+void ACHi::set_fan_speed(const climate::ClimateFanMode &fan_mode) {
   auto it = std::find(std::begin(this->decode_wind_codes_), std::end(this->decode_wind_codes_), speed);
   if (it != std::end(this->decode_wind_codes_)) {
     uint8_t index = std::distance(this->decode_wind_codes_, it);
@@ -516,6 +516,56 @@ void ACHi::set_swing_left_right(bool swing) {
   this->schedule_write_changes();
   ESP_LOGD("ACHi", "Swing Left/Right set to %s", swing ? "ON" : "OFF");
 }
+
+climate::ClimateTraits ACHiClimate::traits() {
+  auto traits = climate::ClimateTraits();
+  traits.set_supports_current_temperature(true);
+  traits.set_supported_modes({
+      climate::CLIMATE_MODE_OFF,
+      climate::CLIMATE_MODE_COOL,
+      climate::CLIMATE_MODE_HEAT,
+      climate::CLIMATE_MODE_FAN_ONLY,
+      climate::CLIMATE_MODE_DRY,
+      climate::CLIMATE_MODE_AUTO,
+  });
+  traits.set_supported_fan_modes({
+      climate::CLIMATE_FAN_AUTO,
+      climate::CLIMATE_FAN_LOW,
+      climate::CLIMATE_FAN_MEDIUM,
+      climate::CLIMATE_FAN_HIGH,
+  });
+  traits.set_visual_min_temperature(16);
+  traits.set_visual_max_temperature(30);
+  traits.set_visual_temperature_step(1);
+  return traits;
+}
+
+void ACHiClimate::control(const climate::ClimateCall &call) {
+  if (call.get_mode().has_value()) {
+    // User changed the mode
+    parent_->set_mode(*call.get_mode());
+  }
+
+  if (call.get_target_temperature().has_value()) {
+    // User changed the target temperature
+    parent_->set_temperature(*call.get_target_temperature());
+  }
+
+  if (call.get_fan_mode().has_value()) {
+    // User changed the fan mode
+    parent_->set_fan_speed(*call.get_fan_mode());
+  }
+
+  // Update the internal state
+  this->mode = call.get_mode().value_or(this->mode);
+  this->target_temperature = call.get_target_temperature().value_or(this->target_temperature);
+  this->fan_mode = call.get_fan_mode().value_or(this->fan_mode);
+
+  this->publish_state();
+}
+
+}  // namespace ac_hi
+}  // namespace esphome
 
 void ACHi::on_climate_call(climate::ClimateCall &call) {
   if (call.get_mode().has_value()) {

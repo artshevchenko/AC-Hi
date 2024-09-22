@@ -16,6 +16,23 @@
 namespace esphome {
 namespace ac_hi {
 
+class ACHi;
+
+class ACHiClimate : public climate::Climate {
+ public:
+  ACHiClimate(ACHi *parent) : parent_(parent) {}
+
+  // Override the traits method
+  climate::ClimateTraits traits() override;
+
+  // Override the control method
+  void control(const climate::ClimateCall &call) override;
+
+ private:
+  // Reference to the parent ACHi component
+  ACHi *parent_;
+};
+
 class ACHi : public PollingComponent, public uart::UARTDevice {
  public:
   ACHi(uart::UARTComponent *parent);
@@ -27,8 +44,8 @@ class ACHi : public PollingComponent, public uart::UARTDevice {
   // Control methods
   void set_power(bool power);
   void set_temperature(float temperature);
-  void set_mode(const std::string &mode);
-  void set_fan_speed(const std::string &speed);
+  void set_mode(const climate::ClimateMode &mode);
+  void set_fan_speed(const climate::ClimateFanMode &fan_mode);
   void set_sleep_mode(const std::string &sleep_mode);
   void set_quiet_mode(bool quiet);
   void set_turbo_mode(bool turbo);
