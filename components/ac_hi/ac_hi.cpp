@@ -39,9 +39,8 @@ ACHi::ACHi(uart::UARTComponent *parent) : PollingComponent(1000), uart::UARTDevi
   swing_up_down_switch = nullptr;
   swing_left_right_switch = nullptr;
 
-  climate_device = new climate::Climate();
+  climate_device = new ACHiClimate;
   climate_device->set_name("AC");
-  climate_device->set_parent(this);
   climate_device->add_on_state_callback([this](climate::ClimateCall &call) {
     this->on_climate_call(call);
   });
@@ -75,7 +74,7 @@ void ACHi::setup() {
   this->status_crc_ = 0;
 
   this->pending_write_ = false;
-  
+
   // Register the climate device
   App.register_component(climate_device);
 }

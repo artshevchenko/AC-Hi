@@ -93,7 +93,7 @@ class ACHi : public PollingComponent, public uart::UARTDevice {
   switch_::Switch *swing_left_right_switch;
 
   // Climate
-  climate::Climate *climate_device;
+  ACHiClimate *climate_device;
 
   void on_climate_call(climate::ClimateCall &call);
 
