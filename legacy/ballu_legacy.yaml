@@ -1,0 +1,1030 @@
+globals:  
+  - id: current_power
+    type: bool
+    initial_value: "0"
+
+  - id: current_set_temp
+    type: uint8_t
+    restore_value: yes
+
+  - id: current_ac_mode
+    type: std::string
+    restore_value: yes
+
+  - id: current_wind
+    type: std::string
+    restore_value: yes
+
+  - id: current_sleep
+    type: std::string
+    restore_value: no
+
+  - id: lock_update
+    type: bool
+    initial_value: "0"
+
+  - id: bytearray
+    type: std::vector<uint8_t>
+    initial_value: '{0xF4, 0xF5, 0x00, 0x40, 0x29, 0x00, 0x00, 0x01, 0x01, 0xFE, 0x01, 0x00, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF4, 0xFB}'
+  
+  - id: write_changes
+    type: bool
+    initial_value: "0"
+  
+  - id: power_bin
+    type: uint8_t
+    initial_value: "0"
+  
+  - id: mode_bin
+    type: uint8_t
+    initial_value: "0"
+  
+  - id: updown_bin
+    type: uint8_t
+    initial_value: "0"
+ 
+  - id: leftright_bin
+    type: uint8_t
+    initial_value: "0"
+  
+  - id: turbo_bin
+    type: uint8_t
+    initial_value: "0"
+  
+  - id: eco_bin
+    type: uint8_t
+    initial_value: "0"
+
+  - id: quiet_bin
+    type: uint8_t
+    initial_value: "0"
+
+
+#Reading AC state
+interval:
+  - interval: 1000ms
+    then:
+      - uart.write: !lambda |-
+                  //ESP_LOGD("LOCK CHECK","%d", id(lock_update) );
+                  //If not locked, read current AC state. Reading is initiated by short request.
+                  //If read is locked, then write changes, or wait until unlocked. 
+                  if (!id(lock_update)) {
+                    std::vector<uint8_t> bytes_to_send {0xF4, 0xF5, 0x00, 0x40, 0x0C, 0x00, 0x00, 0x01, 0x01, 0xFE, 0x01, 0x00, 0x00, 0x66, 0x00, 0x00, 0x00, 0x01, 0xb3, 0xf4, 0xFB};
+                    return bytes_to_send;
+                  } else {
+                    //if (id(write_changes)) {
+                    //   
+                    //} else {
+                        ESP_LOGD("READ SKIP"," Reading lock enabled. Skipping AC state reading.");
+                        std::vector<uint8_t> bytes_to_send {};
+                        return bytes_to_send; 
+                    //} 
+                  }
+                   
+
+script:
+  - id: write_changes_script
+    mode: restart     # commands will be executed in 1 package
+                      # if received in 2 seconds one by one using sliding expiration
+    then:
+      - lambda: ESP_LOGD("COLLECT CHAGES"," Waiting 1500ms for additional AC commands...");
+      - delay: 1500 ms
+      - uart.write: !lambda |-
+                        ESP_LOGD("WRITING CHANGES"," Sliding expiration expired. Writing new values to AC.");
+                        id(write_changes) = false;
+
+                        // merge BIT 18 power & mode
+                      
+                        id(bytearray)[18] = id(power_bin) + id(mode_bin);
+                        ESP_LOGD("WRITE BYTE 18","Power - Mode, val %s",  String(id(bytearray)[18],BIN)); 
+
+                        // merge BIT 32 up-down & left-right
+                      
+                        id(bytearray)[32] = id(updown_bin) + id(leftright_bin);
+                        ESP_LOGD("WRITE BYTE 32","Up-Down Left-Right, val %s",  String(id(bytearray)[32],BIN));
+                      
+                        // merge BIT 33 turbo & eco
+                      
+                        id(bytearray)[33] = id(turbo_bin) + id(eco_bin);
+                        ESP_LOGD("WRITE BYTE 33","Eco - Turbo, val %s",  String(id(bytearray)[33],BIN));
+ 
+                        
+                        // quiet mode
+                        id(bytearray)[35] = id(quiet_bin);
+
+                        // Turbo overrides eco & quiet
+                        if (id(turbo_bin)==B00001100) {
+                            id(bytearray)[19] = 0; //override temperature
+                            id(bytearray)[33] = id(turbo_bin); //override eco
+                            id(bytearray)[35] = 0; //override quiet
+                        }
+                        
+                        // restore temp settings after turbo off
+                        if (id(turbo_bin)==B00000100) {
+                          ESP_LOGD("WRITE BYTE 19","Turbo Off Tempdata, val %s",  String(id(bytearray)[19],BIN)); 
+                          ESP_LOGD("WRITE BYTE 19","Current Tempdata, val %s",  String(id(my_temperature).state)); 
+                          //Update my_temperature input_number if changed
+                          auto tempcall = id(my_temperature).make_call();
+                          tempcall.set_value(id(my_temperature).state);
+                          tempcall.perform();
+
+                        //  id(turbo_bin) = 0;
+                        }
+
+
+                        // Quiet overrides turbo & eco when turbo not switching on
+                        if (id(quiet_bin) == 48){
+                          id(bytearray)[33] = B00000100; //switching off turbo & eco
+                          id(bytearray)[35] = id(quiet_bin);
+                        }
+
+
+                        if (id(eco_bin)==B00010000){id(eco_bin) = 0;}
+                        if (id(quiet_bin) == 16){id(quiet_bin) = 0;}
+                        
+                        // turbo mode always to 0
+                        id(turbo_bin) = 0;
+
+                        ESP_LOGD("WRITE BYTE 19","Temp setting, val %s",  String(id(bytearray)[19],BIN));
+
+                        short int csum = 0;
+                        int arrlen = id(bytearray).size();
+                        for (int i = 2; i < arrlen-4; i++) {
+                            csum = csum + id(bytearray)[i];
+                        }
+
+                        uint8_t cr1 = (csum & 0x0000ff00)  >> 8; 
+                        uint8_t cr2 = (csum & 0x000000ff); 
+
+                        id(bytearray)[46] = cr1; 
+                        id(bytearray)[47] = cr2; 
+
+
+                        return id(bytearray);
+           
+
+
+uart:
+  id: mod_bus
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 9600
+  stop_bits: 1
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      delimiter: [0xF4, 0xFB]
+    sequence:
+      - lambda: |-
+          static int status_crc;
+          static std::string decode_acmode_codes[8]{ "fan_only", "heat", "cool", "dry", "auto","auto","auto","auto" }; // auto modes could be auto_dry, auto_heat, auto_cold and auto? no reference in docs
+          static std::string decode_wind_codes[19]{ "off", "auto","auto","","","","","","","", "lowest", "","low","","medium","","high","","highest" }; //auto_modes could be auto_quiet? no reference in docs.
+          static std::string decode_sleep_codes[5]{ "off","sleep_1","sleep_2","sleep_3","sleep_4"};
+
+          //UARTDebug::log_hex(direction, bytes, ' '); //log the data
+          //UARTDebug::log_binary(direction, bytes, ' '); //log the data
+
+          if (bytes.size()>20) {
+              if(bytes[0]==0xF4 & bytes[1]==0xF5) {
+                 
+                //UARTDebug::log_hex(direction, bytes, ' '); //log the data
+                //parsing status message from AC commands 102 and 101
+                
+                if((bytes[13] == 102 & bytes[2] == 1 & !id(lock_update))  ) {
+
+                  // check if something changed using crc check
+                  int crc = 0;
+                  int arrlen = bytes.size();
+
+                  for (int i = 2; i < arrlen-4; i++) {
+                      crc = crc + bytes[i];
+                  }
+
+                  // testing lock
+                  if ( id(lock_update)) {
+                    ESP_LOGD("GET LOCK", "CMD 102 Lock status %d", (bytes[13] == 102 & bytes[2] == 1 & !id(lock_update)) );  
+                  }
+
+
+                  if (crc == status_crc) {
+                    ESP_LOGD("GET CRC_SKIP", "Nothing changed");  
+                  }
+                  // check if crc is different. then update sensors and controls
+                  if (crc != status_crc and bytes[45] < 127) {
+
+                    status_crc = crc;
+
+                    //-------------- Power Status -------------------
+
+                    byte mask = B00001000;
+                    bool checkval = ((bytes[18] & mask)!=0);
+
+                    id(current_power) = checkval;
+                  
+                    ESP_LOGD("POWER","Data masked- %s, bool %d, cur_power %d",  String( ((bytes[18] & mask)!=0) ), checkval , current_power);
+                    
+                    //Changed to determine difference between switch and current power state from uart data
+                    if((id(current_power)!= (id(switch_power).state)) || (id(current_power)!= (id(power).state=="ON"))?(1):(0)  ) {
+                      if( id(current_power) ) {
+                          
+                          id(power).publish_state( "ON" );
+                          id(switch_power).publish_state(true);
+                      } else {
+                          id(power).publish_state( "OFF" );
+                          id(switch_power).publish_state (false);
+                      }
+                    }
+                   
+
+                    //-------------- Current wind global ---------------
+                    
+                    if (id(current_wind) != (decode_wind_codes[ (bytes[16])  ])) {
+                      id(current_wind) = (decode_wind_codes[ (bytes[16])  ]);
+                      id(sensor_wind).publish_state( bytes[16]) ;
+                      
+                      auto windcall = id(ac_wind).make_call();
+                      windcall.set_option(  id(current_wind) );
+                      ESP_LOGD("AC WIND GET", "Update option to  %s",   id(current_wind).c_str() );
+                      windcall.perform();
+                    }
+
+
+                    //------------- Current ac_sleep global -----------------
+                    if ( id(current_sleep) != (decode_sleep_codes[ (bytes[17]) ]) ) {
+                      id(current_sleep) = (decode_sleep_codes[ (bytes[17])  ]);
+
+                      id(sensor_sleep).publish_state( bytes[17]) ;
+                      
+                      auto sleepcall = id(ac_sleep).make_call();
+                      sleepcall.set_option(  id(current_sleep) );
+                      ESP_LOGD("AC SLEEP GET", "Update option to  %s hex value: %s",   id(current_sleep).c_str(), String(bytes[17],HEX) );
+                      sleepcall.perform();
+                    }
+
+                    // ------------ Current ac mode --------------
+                    
+                    if ( id(current_ac_mode) != (decode_acmode_codes[ (bytes[18] >> 4)  ]) ) {
+                      id(current_ac_mode) = (decode_acmode_codes[ (bytes[18] >> 4)  ]);
+                      id(sensor_mode).publish_state( (bytes[18] >> 4) );
+
+                      auto modecall = id(ac_mode).make_call();
+                      modecall.set_option(  id(current_ac_mode) );
+                      ESP_LOGD("AC MODE GET", "Update option to  %s decimal value %d",   id(current_ac_mode).c_str(), bytes[18] >> 4 );
+                      modecall.perform();
+                    }
+
+                    // ---------------Current set_temp global  ---------------   
+                    if (id(current_set_temp) != bytes[19]) {
+                      id(current_set_temp) = bytes[19];
+                      id(temp_set).publish_state( bytes[19]);
+
+
+                      //Update my_temperature input_number if changed
+                      auto tempcall = id(my_temperature).make_call();
+                      tempcall.set_value(bytes[19]);
+                      tempcall.perform();
+                    }
+                     
+                        id(temp_current).publish_state( bytes[20]); 
+                        id(temp_pipe_current).publish_state( bytes[21]);
+
+                        id(compr_freq_set).publish_state( bytes[42]);
+                        id(compr_freq).publish_state( bytes[43]);
+
+                        id(temp_outdoor).publish_state( bytes[44]);
+                        id(temp_outdoor_condenser).publish_state( bytes[45]);
+
+
+                      // update this data only if command from ac = 102
+                      if ( bytes[13] == 102 ) {
+
+                        byte quiet_mask = B00000100;
+                        id(sensor_quiet).publish_state( (bytes[36] & quiet_mask)!=0 );
+                        id(switch_quiet).publish_state( (bytes[36] & quiet_mask)!=0 );
+
+                        byte eco_mask = B00000100;
+                        id(sensor_eco).publish_state( (bytes[35] & eco_mask)!=0 ); 
+                        id(switch_eco).publish_state( (bytes[35] & eco_mask)!=0 );
+
+                        byte turbo_mask = B00000010;
+                        id(sensor_turbo).publish_state( (bytes[35] & turbo_mask) !=0 );
+                        id(switch_turbo).publish_state( (bytes[35] & turbo_mask) !=0 );
+
+                        byte led_mask = B10000000;
+                        id(sensor_led).publish_state( (bytes[37] & led_mask)!=0 );
+                        id(switch_led).publish_state( (bytes[37] & led_mask)!=0 );
+
+                        byte updown_mask =  B10000000;
+                        id(sensor_up_down).publish_state( (bytes[35] & updown_mask) !=0 );
+                        id(switch_up_down).publish_state( (bytes[35] & updown_mask) !=0 );
+
+                        byte lr_mask = B01000000;
+                        id(sensor_left_right).publish_state( (bytes[35] & lr_mask) !=0 );
+                        id(switch_left_right).publish_state( (bytes[35] & lr_mask) !=0 );
+                      }
+                  }
+                }
+                
+                //unlocking interval cmd 102 updates
+                if (( bytes[13] == 101 & bytes[2] == 1)) {
+                  id(lock_update) = false;
+                  ESP_LOGD("GET LOCK", "Update lock released");
+                }
+
+
+              }
+          }
+
+text_sensor:
+  - platform: template
+    name: "Power Status"
+    id: "power"
+
+sensor:
+  - platform: template
+    name: "Wind"
+    id: "sensor_wind"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Sleep"
+    id: "sensor_sleep"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Mode"
+    id: "sensor_mode"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Temperature Set"
+    id: "temp_set"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Temperature Current"
+    id: "temp_current"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Compressor Frequency Set"
+    id: "compr_freq_set"
+    unit_of_measurement: "Hz"
+    device_class: "frequency"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Compressor Frequency"
+    id: "compr_freq"
+    unit_of_measurement: "Hz"
+    device_class: "frequency"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Temperature Outdoor"
+    id: "temp_outdoor"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Temperature Outdoor Condenser"
+    id: "temp_outdoor_condenser"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Quiet"
+    id: "sensor_quiet"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Turbo"
+    id: "sensor_turbo"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "LED"
+    id: "sensor_led"
+    accuracy_decimals: 0 
+  
+  - platform: template
+    name: "Economy"
+    id: "sensor_eco"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Temperature Pipe Current"
+    id: "temp_pipe_current"
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Left-Right"
+    id: "sensor_left_right"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Up-Down"
+    id: "sensor_up_down"
+    accuracy_decimals: 0
+
+
+number:
+  - platform: template
+    id: my_temperature
+    name: "Temperature"
+    optimistic: true
+    min_value: 16
+    max_value: 30
+    step: 1 
+    on_value:
+            lambda: |- 
+                      uint8_t c = id(my_temperature).state;
+                      uint8_t tempX = 0; 
+                      tempX = (c << 1); 
+                      tempX |= (1ul << 0); 
+          
+                       
+
+                      if ( (id(current_set_temp) != id(my_temperature).state) & (c>16ul || c<30ul) ) {
+                      //if (c>16ul || c<30ul) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET Target Temp","Temp to set %d", c );
+                        id(bytearray)[19] = tempX;
+
+                        id(write_changes_script).execute();
+                      } 
+
+                 
+
+select:  # AC Modes
+
+  - platform: template
+    id: "ac_mode"
+    name: "AC Mode"
+    optimistic: true
+    options:
+      - fan_only
+      - heat
+      - cool
+      - dry
+      - auto
+    on_value: 
+            lambda: |-  
+ 
+                        //encode ac_mode codes
+                        static uint8_t listix_to_mode_codes[5]{0,1,2,3,4};
+                        // protocol asks to shift 1 bit left  and set last bit to 1
+
+                        uint8_t mode = listix_to_mode_codes[ i ] << 1;
+
+                        mode |= (1ul << 0);
+                        mode = mode << 4;                
+                        id(mode_bin) = mode; 
+
+                        if (x != id(current_ac_mode)) {
+                          id(write_changes) = 1; 
+                          id(lock_update) = 1;
+                          ESP_LOGD("SET AC Mode","Mode set %d , BIN %s", i , String(  id(bytearray)[18] , BIN ) );
+                          id(write_changes_script).execute();
+                        }
+
+
+
+        
+
+  - platform: template  # AC Wind
+    id: "ac_wind"
+    name: "Wind mode"
+    optimistic: true
+    options:
+      - "off"
+      - auto
+      - lowest
+      - low
+      - medium
+      - high
+      - highest
+    on_value: 
+            lambda: |- 
+                      //encode ac_wind codes
+
+                      static uint8_t listix_to_wind_codes[7]{0,1,10,12,14,16,18};
+                      //protocol asks to add +1 to value when writing
+
+                      uint8_t mode = listix_to_wind_codes[ i ] + 1;
+
+                      id(bytearray)[16] = mode;
+
+                      if (x != id(current_wind)) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC WIND speed","Mode set %d , BIN %s", i , String( id(bytearray)[16] , BIN ) );
+                        id(bytearray)[16] = mode;
+                        id(write_changes_script).execute();
+                        } 
+
+
+
+
+  - platform: template  # AC Sleep
+    id: "ac_sleep"
+    name: "Sleep Mode"
+    optimistic: true
+    options:
+      - "off"
+      - sleep_1
+      - sleep_2
+      - sleep_3
+      - sleep_4
+    on_value: 
+            lambda: |-  
+                      //encode sleep mode codes
+
+                      static uint8_t listix_to_sleep_codes[5]{0,1,2,4,8};
+
+                      //protocol asks to shoft 1 bit right and set 1 to left bit when writing
+
+                      uint8_t mode = listix_to_sleep_codes[ i ] << 1;
+                      mode |= (1ul << 0);
+
+                      id(bytearray)[17] = mode; 
+
+                      if (x != id(current_sleep)) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC Sleep","Mode set %d , BIN %s", i , String(  id(bytearray)[17] , BIN ) );
+                        id(write_changes_script).execute();
+                       }             
+
+
+
+
+switch: 
+ 
+  - platform: template # AC Power Switch
+    name: "AC Power"
+    id: "switch_power"
+    optimistic: True
+    turn_on_action:
+      - if:
+          condition:
+              lambda: 'return  !id(current_power) ;'
+          then: 
+            lambda: |-  
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+           
+                        id(power_bin) =  B00001100; 
+
+                        ESP_LOGD("SET AC Power","Switching ON, BIN %s", String(  id(bytearray)[18] , BIN ) );
+                        id(write_changes_script).execute();
+
+    turn_off_action:
+      - if:
+          condition:
+              lambda: 'return id(current_power) ;'
+          then:
+            lambda: |-  
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        //id(bytearray)[18] = id(bytearray)[18] & (~(1<<3));
+                        id(power_bin) = B00000100; 
+
+                        ESP_LOGD("SET AC Power","Switching OFF, BIN %s", String(  id(bytearray)[18] , BIN ) );
+                        id(write_changes_script).execute();
+
+ 
+  - platform: template #Quiet Switch
+    name: "Quiet Mode"
+    id: "switch_quiet"
+    optimistic: True
+    turn_on_action:
+            lambda: |-
+                      uint8_t quiet_mask = 48; 
+                      ESP_LOGD("RESET AC Quiet","Reset ON BIN %s", String( id(bytearray)[35] , BIN ) );
+                      id(quiet_bin) = quiet_mask;
+
+                      if (id(sensor_quiet).state == 0) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC Quiet","Mode set ON BIN %s", String( id(bytearray)[35] , BIN ) );
+                        id(quiet_bin) = quiet_mask;
+                        id(write_changes_script).execute();
+                        }  
+                         
+
+
+
+
+    turn_off_action:
+            lambda: |-  
+                      uint8_t quiet_mask = 16; 
+                      ESP_LOGD("RESET AC Quiet","Reset - BIN %s", String( id(bytearray)[35] , BIN ) );
+                      id(quiet_bin) = 0;
+
+                      if (id(sensor_quiet).state == 1) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC Quiet","Mode set OFF BIN %s", String( id(bytearray)[35] , BIN ) );
+                        id(quiet_bin) = quiet_mask;
+                        id(write_changes_script).execute();
+                      }             
+
+
+
+
+#Turbo switch 00001100 00000000 00110000
+  - platform: template  
+    name: "Turbo Mode"
+    id: "switch_turbo"
+    optimistic: True
+    turn_on_action:
+            lambda: |- 
+                      uint8_t turbo_mask = B00001100; 
+
+                      //id(bytearray)[33] = turbo_mask;
+                      id(turbo_bin) = turbo_mask;
+
+                      if (id(sensor_turbo).state == 0) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC TURBO","Mode set ON BIN %s", String(  id(bytearray)[33] , BIN ) );
+                        id(turbo_bin) = turbo_mask;
+                        id(write_changes_script).execute();
+                      }           
+
+    
+    turn_off_action:
+            lambda: |-  
+                      uint8_t turbo_mask = B00000100; 
+                     
+                      //id(bytearray)[33] = turbo_mask; 
+                      //id(turbo_bin) = 0;
+
+                      if (id(sensor_turbo).state == 1) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC TURBO","Mode set OFF BIN %s", String(  id(bytearray)[33] , BIN ) );
+                        id(turbo_bin) = turbo_mask;
+                        id(write_changes_script).execute();
+                      }                                  
+
+
+
+
+
+
+
+  - platform: template  #LED Switch  00001100 00000000 00110000 11000000
+    name: "LED Switch"  
+    id: "switch_led"
+    optimistic: True
+    turn_on_action:
+            lambda: |-  
+                      uint8_t mask = B11000000; 
+
+                      id(bytearray)[36] = mask; 
+
+                      if (id(sensor_led).state == 0) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC LED","Mode set ON BIN %s", String(  id(bytearray)[36] , BIN ) );
+                        id(write_changes_script).execute();
+                      }
+
+
+    turn_off_action:
+            lambda: |-  
+                      uint8_t mask = B01000000; 
+                      id(bytearray)[36] = mask; 
+
+                      if (id(sensor_led).state == 1) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC LED","Mode set OFF BIN %s", String(  id(bytearray)[36] , BIN ) );
+                        id(write_changes_script).execute();
+                      }
+
+  - platform: template #ECO switch offset 138
+
+    name: "ECO Mode"
+    id: "switch_eco"
+    optimistic: True
+    turn_on_action:
+            lambda: |-  
+                      uint8_t eco_mask = B00110000; 
+                      //id(bytearray)[33] = eco_mask; 
+                      id(eco_bin) = eco_mask;
+
+                      if (id(sensor_eco).state == 0) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                      ESP_LOGD("SET AC ECO","Mode set ON BIN %s", String(  id(bytearray)[33] , BIN ) );
+                      id(eco_bin) = eco_mask;
+                      id(write_changes_script).execute();
+                      } 
+
+
+
+    turn_off_action:
+            lambda: |-  
+                      uint8_t eco_mask = B00010000; 
+                      //id(bytearray)[33] = eco_mask; 
+                      //id(eco_bin) = 0;
+
+                      if (id(sensor_eco).state == 1) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        id(eco_bin) = eco_mask;
+                      ESP_LOGD("SET AC ECO","Mode set OFF BIN %s", String(  id(bytearray)[33] , BIN ) );
+                      id(write_changes_script).execute();
+                      }
+
+
+ 
+  - platform: template #UP-DOWN switch - offset 128 31 0000 0000 32 11000000 33 00110000 00000000 00110000
+    name: "Swing Up/Down "
+    id: "switch_up_down"
+    optimistic: True
+    turn_on_action:
+            lambda: |-  
+                      uint8_t updown_mask = B11000000; 
+
+                      //id(bytearray)[32] = updown_mask; 
+                      id(updown_bin) = updown_mask;
+
+                      if (id(sensor_up_down).state == 0) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                      ESP_LOGD("SET AC UP-DOWN","Mode set ON BIN %s", String(  id(bytearray)[32] , BIN ) );
+                      id(write_changes_script).execute();
+                      } 
+
+
+
+    turn_off_action:
+            lambda: |-  
+                      uint8_t updown_mask = B01000000; 
+                      //id(bytearray)[32] = updown_mask; 
+                      id(updown_bin) = updown_mask;
+
+                      if (id(sensor_up_down).state == 1) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC UP-DOWN","Mode set OFF BIN %s", String(  id(bytearray)[32] , BIN ) );
+                        id(write_changes_script).execute();
+                      } 
+
+
+  - platform: template #LEFT-RIGHT switch  offset 130
+    name: "Swing Left/Right"
+    id: "switch_left_right"
+    optimistic: True
+    turn_on_action:
+            lambda: |-  
+                      uint8_t lr_mask = B00110000; 
+
+                      //id(bytearray)[32] = lr_mask;
+                      id(leftright_bin)=lr_mask; 
+
+                      if (id(sensor_left_right).state == 0) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC LR SET","Mode set ON BIN %s", String(  id(bytearray)[32] , BIN ) );
+                        id(write_changes_script).execute();
+                      } 
+
+
+                
+    turn_off_action:
+            lambda: |-  
+                      uint8_t lr_mask = B00010000; 
+                      //id(bytearray)[32] = lr_mask; 
+                      id(leftright_bin)=lr_mask;
+
+                      if (id(sensor_left_right).state == 1) {
+                        id(write_changes) = 1; 
+                        id(lock_update) = 1;
+                        ESP_LOGD("SET AC LR SET","Mode set OFF BIN %s", String(  id(bytearray)[32] , BIN ) );
+                        id(write_changes_script).execute();
+                      } 
+
+climate:
+  - platform: custom
+    lambda: |-
+      // Define the custom climate class
+      class MyCustomClimate : public esphome::climate::Climate, public esphome::PollingComponent {
+        public:
+          MyCustomClimate() : PollingComponent(150) {}
+
+          void setup() override {
+            id(my_temperature).publish_state(25.0);
+            id(sensor_led).publish_state(1);
+          }
+
+          esphome::climate::ClimateTraits traits() override {
+            auto traits = esphome::climate::ClimateTraits();
+            traits.set_supports_current_temperature(true);  // Поддержка текущей температуры
+            traits.set_supported_modes({CLIMATE_MODE_COOL, CLIMATE_MODE_HEAT, CLIMATE_MODE_FAN_ONLY, CLIMATE_MODE_DRY, CLIMATE_MODE_OFF, CLIMATE_MODE_AUTO});
+            traits.set_supported_fan_modes({CLIMATE_FAN_LOW, CLIMATE_FAN_MEDIUM, CLIMATE_FAN_HIGH, CLIMATE_FAN_AUTO});
+            traits.set_supported_swing_modes({CLIMATE_SWING_OFF, CLIMATE_SWING_VERTICAL, CLIMATE_SWING_HORIZONTAL, CLIMATE_SWING_BOTH});
+            traits.set_visual_min_temperature(16.0);    // Min temperature
+            traits.set_visual_max_temperature(30.0);    // Max temperature
+            traits.set_visual_temperature_step(1.0f);   // Temperature step
+            return traits;
+          }
+
+          void control(const esphome::climate::ClimateCall &call) override {
+            if (call.get_mode().has_value()) {
+              esphome::climate::ClimateMode mode = *call.get_mode();
+              switch (mode) {
+                case CLIMATE_MODE_COOL:
+                  id(switch_power).turn_on();               // Turn on the switch
+                  id(ac_mode).publish_state("cool");        // Set AC mode to cool
+                  this->mode = CLIMATE_MODE_COOL;
+                  break;
+                case CLIMATE_MODE_HEAT:
+                  id(switch_power).turn_on();
+                  id(ac_mode).publish_state("heat");        // Set AC mode to heat
+                  this->mode = CLIMATE_MODE_HEAT;
+                  break;
+                case CLIMATE_MODE_FAN_ONLY:
+                  id(switch_power).turn_on();
+                  id(ac_mode).publish_state("fan_only");    // Set AC mode to fan-only
+                  this->mode = CLIMATE_MODE_FAN_ONLY;
+                  break;
+                case CLIMATE_MODE_DRY:
+                  id(switch_power).turn_on();
+                  id(ac_mode).publish_state("dry");         // Set AC mode to dry
+                  this->mode = CLIMATE_MODE_DRY;
+                  break;
+                case CLIMATE_MODE_OFF:
+                  id(switch_power).turn_off();              // Turn off the switch
+                  this->mode = CLIMATE_MODE_OFF;
+                  break;
+                case CLIMATE_MODE_AUTO:
+                  id(switch_power).turn_on();
+                  id(ac_mode).publish_state("auto");         // Set AC mode to auto
+                  this->mode = CLIMATE_MODE_AUTO;
+                default:
+                  break;
+              }
+              this->publish_state();
+            }
+
+            // Обновление текущей температуры
+            this->current_temperature = id(temp_current).state;
+            this->target_temperature = id(my_temperature).state;
+            this->publish_state();
+
+            if (call.get_target_temperature().has_value()) {
+              float target_temp = *call.get_target_temperature();
+              id(my_temperature).publish_state(target_temp); // Publish the new target temperature
+              this->target_temperature = target_temp;
+              this->publish_state();
+            }
+
+            if (call.get_fan_mode().has_value()) {
+              esphome::climate::ClimateFanMode fan_mode = *call.get_fan_mode();
+              switch (fan_mode) {
+                case CLIMATE_FAN_LOW:
+                  id(ac_wind).publish_state("lowest");
+                  break;
+                case CLIMATE_FAN_MEDIUM:
+                  id(ac_wind).publish_state("medium");
+                  break;
+                case CLIMATE_FAN_HIGH:
+                  id(ac_wind).publish_state("highest");
+                  break;
+                case CLIMATE_FAN_AUTO:
+                  id(ac_wind).publish_state("auto");
+                  break;
+              }
+              this->fan_mode = fan_mode;
+              this->publish_state();
+            }
+
+            if (call.get_swing_mode().has_value()) {
+              esphome::climate::ClimateSwingMode swing_mode = *call.get_swing_mode();
+              switch (swing_mode) {
+                case CLIMATE_SWING_OFF:
+                  id(switch_up_down).turn_off();
+                  id(switch_left_right).turn_off();
+                  break;
+                case CLIMATE_SWING_VERTICAL:
+                  id(switch_up_down).turn_on();
+                  id(switch_left_right).turn_off();
+                  break;
+                case CLIMATE_SWING_HORIZONTAL:
+                  id(switch_left_right).turn_on();
+                  id(switch_up_down).turn_off();
+                  break;
+                case CLIMATE_SWING_BOTH:
+                  id(switch_up_down).turn_on();
+                  id(switch_left_right).turn_on();
+                  break;
+              }
+              this->swing_mode = swing_mode;
+              this->publish_state();
+            }
+          }
+
+          void update() override {
+            // Обновляем текущую температуру
+            float new_current_temp = id(temp_current).state;
+            if (this->current_temperature != new_current_temp) {
+              this->current_temperature = new_current_temp;
+              // Логирование для отладки
+              ESP_LOGD("custom_climate", "Updated current temperature: %.1f", this->current_temperature);
+              this->publish_state();
+            }
+
+            // Обновляем целевую температуру
+            float new_target_temp = id(my_temperature).state;
+            if (this->target_temperature != new_target_temp) {
+              this->target_temperature = new_target_temp;
+              ESP_LOGD("custom_climate", "Updated target temperature: %.1f", this->target_temperature);
+              this->publish_state();
+            }
+
+            // Обновляем режим работы
+            esphome::climate::ClimateMode new_mode;
+            if (id(switch_power).state == false) {
+              new_mode = CLIMATE_MODE_OFF;
+            } else {
+              if (id(ac_mode).state == "fan_only") {
+                new_mode = CLIMATE_MODE_FAN_ONLY;
+              } else if (id(ac_mode).state == "heat") {
+                new_mode = CLIMATE_MODE_HEAT;
+              } else if (id(ac_mode).state == "cool") {
+                new_mode = CLIMATE_MODE_COOL;
+              } else if (id(ac_mode).state == "dry") {
+                new_mode = CLIMATE_MODE_DRY;
+              } else {
+                new_mode = CLIMATE_MODE_AUTO;
+              }
+            }
+            if (this->mode != new_mode) {
+              this->mode = new_mode;
+              ESP_LOGD("custom_climate", "Updated mode");
+              this->publish_state();
+            }
+
+            // Обновляем скорость вентилятора
+            esphome::climate::ClimateFanMode new_fan_mode;
+            if (id(ac_wind).state == "lowest") {
+              new_fan_mode = CLIMATE_FAN_LOW;
+            } else if (id(ac_wind).state == "medium") {
+              new_fan_mode = CLIMATE_FAN_MEDIUM;
+            } else if (id(ac_wind).state == "highest") {
+              new_fan_mode = CLIMATE_FAN_HIGH;
+            } else {
+              new_fan_mode = CLIMATE_FAN_AUTO;
+            }
+            if (this->fan_mode != new_fan_mode) {
+              this->fan_mode = new_fan_mode;
+              ESP_LOGD("custom_climate", "Updated fan mode");
+              this->publish_state();
+            }
+
+            // Обновляем режим качания (swing mode)
+            esphome::climate::ClimateSwingMode new_swing_mode;
+            if (id(switch_up_down).state && id(switch_left_right).state) {
+              new_swing_mode = CLIMATE_SWING_BOTH;
+            } else if (id(switch_up_down).state) {
+              new_swing_mode = CLIMATE_SWING_VERTICAL;
+            } else if (id(switch_left_right).state) {
+              new_swing_mode = CLIMATE_SWING_HORIZONTAL;
+            } else {
+              new_swing_mode = CLIMATE_SWING_OFF;
+            }
+            if (this->swing_mode != new_swing_mode) {
+              this->swing_mode = new_swing_mode;
+              ESP_LOGD("custom_climate", "Updated swing mode");
+              this->publish_state();
+            }
+          }
+      };
+      auto my_climate = new MyCustomClimate();  // Correct custom climate instantiation
+      App.register_component(my_climate);       // Registering the component
+      return {my_climate};                      // Returning as a vector of climates
+    climates:
+      - name: "AC"
+        id: my_climate
