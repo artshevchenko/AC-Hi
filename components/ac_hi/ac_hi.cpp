@@ -1,4 +1,5 @@
 #include "ac_hi.h"
+#include "esphome/components/climate/climate.h"
 
 namespace esphome {
 namespace ac_hi {
@@ -38,7 +39,12 @@ ACHi::ACHi(UARTComponent *parent) : UARTDevice(parent) {
   swing_up_down_switch = nullptr;
   swing_left_right_switch = nullptr;
 
-  climate_device = nullptr;
+  climate_device = new climate::Climate();
+  climate_device->set_name("AC");
+  climate_device->set_parent(this);
+  climate_device->add_on_state_callback([this](climate::ClimateCall &call) {
+    this->on_climate_call(call);
+  });
 }
 
 void ACHi::setup() {
@@ -69,6 +75,37 @@ void ACHi::setup() {
   this->status_crc_ = 0;
 
   this->pending_write_ = false;
+
+  if (climate_device != nullptr) {
+    auto traits = climate::ClimateTraits();
+    traits.set_supports_current_temperature(true);
+    traits.set_visual_min_temperature(16.0f);
+    traits.set_visual_max_temperature(30.0f);
+    traits.set_visual_temperature_step(1.0f);
+    traits.set_supported_modes({
+      climate::CLIMATE_MODE_COOL,
+      climate::CLIMATE_MODE_HEAT,
+      climate::CLIMATE_MODE_FAN_ONLY,
+      climate::CLIMATE_MODE_DRY,
+      climate::CLIMATE_MODE_AUTO,
+      climate::CLIMATE_MODE_OFF
+    });
+    traits.set_supported_fan_modes({
+      climate::CLIMATE_FAN_LOW,
+      climate::CLIMATE_FAN_MEDIUM,
+      climate::CLIMATE_FAN_HIGH,
+      climate::CLIMATE_FAN_AUTO
+    });
+    traits.set_supported_swing_modes({
+      climate::CLIMATE_SWING_OFF,
+      climate::CLIMATE_SWING_VERTICAL,
+      climate::CLIMATE_SWING_HORIZONTAL,
+      climate::CLIMATE_SWING_BOTH
+    });
+    climate_device->set_traits(traits);
+  }
+  // Register climate device
+  this->climate_device->setup();
 }
 
 void ACHi::loop() {
@@ -475,6 +512,89 @@ void ACHi::set_swing_left_right(bool swing) {
   this->schedule_write_changes();
   ESP_LOGD("ACHi", "Swing Left/Right set to %s", swing ? "ON" : "OFF");
 }
+
+void ACHi::on_climate_call(climate::ClimateCall &call) {
+  if (call.get_mode().has_value()) {
+    auto mode = *call.get_mode();
+    switch (mode) {
+      case climate::CLIMATE_MODE_COOL:
+        set_power(true);
+        set_mode("cool");
+        break;
+      case climate::CLIMATE_MODE_HEAT:
+        set_power(true);
+        set_mode("heat");
+        break;
+      case climate::CLIMATE_MODE_FAN_ONLY:
+        set_power(true);
+        set_mode("fan_only");
+        break;
+      case climate::CLIMATE_MODE_DRY:
+        set_power(true);
+        set_mode("dry");
+        break;
+      case climate::CLIMATE_MODE_AUTO:
+        set_power(true);
+        set_mode("auto");
+        break;
+      case climate::CLIMATE_MODE_OFF:
+        set_power(false);
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (call.get_target_temperature().has_value()) {
+    float temp = *call.get_target_temperature();
+    set_temperature(temp);
+  }
+
+  if (call.get_fan_mode().has_value()) {
+    auto fan_mode = *call.get_fan_mode();
+    switch (fan_mode) {
+      case climate::CLIMATE_FAN_LOW:
+        set_fan_speed("lowest");
+        break;
+      case climate::CLIMATE_FAN_MEDIUM:
+        set_fan_speed("medium");
+        break;
+      case climate::CLIMATE_FAN_HIGH:
+        set_fan_speed("highest");
+        break;
+      case climate::CLIMATE_FAN_AUTO:
+        set_fan_speed("auto");
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (call.get_swing_mode().has_value()) {
+    auto swing_mode = *call.get_swing_mode();
+    switch (swing_mode) {
+      case climate::CLIMATE_SWING_OFF:
+        set_swing_up_down(false);
+        set_swing_left_right(false);
+        break;
+      case climate::CLIMATE_SWING_VERTICAL:
+        set_swing_up_down(true);
+        set_swing_left_right(false);
+        break;
+      case climate::CLIMATE_SWING_HORIZONTAL:
+        set_swing_up_down(false);
+        set_swing_left_right(true);
+        break;
+      case climate::CLIMATE_SWING_BOTH:
+        set_swing_up_down(true);
+        set_swing_left_right(true);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 
 }  // namespace ac_hi
 }  // namespace esphome

@@ -63,7 +63,9 @@ class ACHi : public Component, public UARTDevice {
   Switch *swing_left_right_switch;
 
   // Climate
-  climate::Climate *climate_device;
+  //climate::Climate *climate_device;
+  public:
+    climate::Climate *climate_device = new climate::Climate();
 
   // Callback methods for component events
   void on_my_temperature_value(float value);
