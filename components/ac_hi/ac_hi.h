@@ -37,63 +37,47 @@ class ACHi : public PollingComponent, public UARTDevice {
   void set_swing_up_down(bool swing);
   void set_swing_left_right(bool swing);
 
-  // Sensors
-  Sensor *sensor_wind;
-  Sensor *sensor_sleep;
-  Sensor *sensor_mode;
-  Sensor *temp_set;
-  Sensor *temp_current;
-  Sensor *compr_freq_set;
-  Sensor *compr_freq;
-  Sensor *temp_outdoor;
-  Sensor *temp_outdoor_condenser;
-  Sensor *sensor_quiet;
-  Sensor *sensor_turbo;
-  Sensor *sensor_led;
-  Sensor *sensor_eco;
-  Sensor *temp_pipe_current;
-  Sensor *sensor_left_right;
-  Sensor *sensor_up_down;
+    // Sensors
+  sensor::Sensor *sensor_wind;
+  sensor::Sensor *sensor_sleep;
+  sensor::Sensor *sensor_mode;
+  sensor::Sensor *temp_set;
+  sensor::Sensor *temp_current;
+  sensor::Sensor *compr_freq_set;
+  sensor::Sensor *compr_freq;
+  sensor::Sensor *temp_outdoor;
+  sensor::Sensor *temp_outdoor_condenser;
+  sensor::Sensor *sensor_quiet;
+  sensor::Sensor *sensor_turbo;
+  sensor::Sensor *sensor_led;
+  sensor::Sensor *sensor_eco;
+  sensor::Sensor *temp_pipe_current;
+  sensor::Sensor *sensor_left_right;
+  sensor::Sensor *sensor_up_down;
 
   // Text Sensors
-  TextSensor *power_status;
+  text_sensor::TextSensor *power_status;
 
   // Number (Temperature Control)
-  Number *my_temperature;
+  number::Number *my_temperature;
 
   // Selects
-  Select *ac_mode_select;
-  Select *ac_wind_select;
-  Select *ac_sleep_select;
+  select::Select *ac_mode_select;
+  select::Select *ac_wind_select;
+  select::Select *ac_sleep_select;
 
   // Switches
-  Switch *power_switch;
-  Switch *quiet_switch;
-  Switch *turbo_switch;
-  Switch *eco_switch;
-  Switch *led_switch;
-  Switch *swing_up_down_switch;
-  Switch *swing_left_right_switch;
+  switch_::Switch *power_switch;
+  switch_::Switch *quiet_switch;
+  switch_::Switch *turbo_switch;
+  switch_::Switch *eco_switch;
+  switch_::Switch *led_switch;
+  switch_::Switch *swing_up_down_switch;
+  switch_::Switch *swing_left_right_switch;
 
   // Climate
-  //climate::Climate *climate_device;
-  public:
-    climate::Climate *climate_device = new climate::Climate();
+  climate::Climate *climate_device;
 
-  // Callback methods for component events
-  void on_my_temperature_value(float value);
-  void on_ac_mode_select_value(const std::string &value);
-  void on_ac_wind_select_value(const std::string &value);
-  void on_ac_sleep_select_value(const std::string &value);
-  void on_power_switch_state(bool state);
-  void on_quiet_switch_state(bool state);
-  void on_turbo_switch_state(bool state);
-  void on_eco_switch_state(bool state);
-  void on_led_switch_state(bool state);
-  void on_swing_up_down_switch_state(bool state);
-  void on_swing_left_right_switch_state(bool state);
-
-  // Climate control methods
   void on_climate_call(climate::ClimateCall &call);
 
  private:
@@ -125,7 +109,6 @@ class ACHi : public PollingComponent, public UARTDevice {
   void schedule_write_changes();
 
   // Timer for periodic actions
-  uint32_t last_read_time_;
   uint32_t last_write_time_;
 
   // Other necessary variables
