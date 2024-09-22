@@ -354,7 +354,7 @@ void ACHi::set_mode(const climate::ClimateMode &mode) {
     uint8_t mode_bin = ((this->mode_codes_[index] << 1) | 0x01) << 4;
     this->mode_bin_ = mode_bin;
     this->schedule_write_changes();
-    ESP_LOGD("ACHi", "AC mode set to %s", mode.c_str());
+    ESP_LOGD("ACHi", "AC mode set to %s", mode);
   }
 }
 
