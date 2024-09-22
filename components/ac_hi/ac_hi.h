@@ -18,7 +18,7 @@ namespace ac_hi {
 
 class ACHi : public PollingComponent, public uart::UARTDevice {
  public:
-  ACHi(UARTComponent *parent);
+  ACHi(uart::UARTComponent *parent);
 
   void setup() override;
   void loop() override;

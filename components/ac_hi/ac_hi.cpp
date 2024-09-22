@@ -4,7 +4,7 @@
 namespace esphome {
 namespace ac_hi {
 
-ACHi::ACHi(UARTComponent *parent) : UARTDevice(parent) {
+ACHi::ACHi(uart::UARTComponent *parent) : PollingComponent(1000), uart::UARTDevice(parent) {
   // Initialize pointers to nullptr
   sensor_wind = nullptr;
   sensor_sleep = nullptr;
