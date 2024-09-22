@@ -113,7 +113,10 @@ void ACHi::send_read_command() {
 
 // Process incoming UART data from the AC unit
 void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
-  UARTDebug::log_int(direction, bytes, ' '); //log the data
+  // Manual debug
+  for (int val = 0; val < bytes.size(); val++) {
+    ESP_LOGD("ACHi", "BYTE %s: val %s", to_string(val).c_str(), to_string(bytes[val]).c_str());
+  }
   if (bytes.size() > 20 && bytes[0] == 0xF4 && bytes[1] == 0xF5) {
     // Parse status message from AC commands 102 and 101
     if ((bytes[13] == 102 && bytes[2] == 1 && !this->lock_update_)) {
