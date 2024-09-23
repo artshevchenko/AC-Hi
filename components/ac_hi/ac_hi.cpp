@@ -86,7 +86,8 @@ void ACHi::loop() {
       ESP_LOGD("ACHi", "Reading lock enabled. Skipping AC state reading.");
     }
   }
-
+  
+  ESP_LOGD("ACHi", "Time since last write time: %s", to_string(now - this->last_write_time_).c_str());
   // Handle pending write after delay
   if (this->pending_write_ && now - this->last_write_time_ >= 1500) {
     this->write_changes();
