@@ -241,6 +241,8 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
           if (this->swing_left_right_switch != nullptr)
             this->swing_left_right_switch->publish_state(swing_lr);
         }
+
+        this->pending_write_ = true;
       }
     }
 
