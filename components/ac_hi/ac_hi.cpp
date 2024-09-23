@@ -71,7 +71,8 @@ void ACHi::setup() {
 }
 
 void ACHi::update() {
-  this->loop();
+  //this->loop();
+  ESP_LOGD("ACHi", "Update");
 }
 
 void ACHi::loop() {
@@ -90,8 +91,10 @@ void ACHi::loop() {
   ESP_LOGD("ACHi", "Time since last write time: %s", to_string(now - this->last_write_time_).c_str());
   // Handle pending write after delay
   if (this->pending_write_ && now - this->last_write_time_ >= 1500) {
+    ESP_LOGD("ACHi", "Write start");
     this->write_changes();
     this->pending_write_ = false;
+    ESP_LOGD("ACHi", "Write end");
   }
 
   // Process incoming data
@@ -131,7 +134,7 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         crc += bytes[i];
       }
       ESP_LOGD("ACHi", "Status CRC New: %s", to_string(crc).c_str());
-      if (crc != this->status_crc_ ) { //&& bytes[45] < 127
+      if (crc != this->status_crc_) { //&& bytes[45] < 127
         this->status_crc_ = crc;
         ESP_LOGD("ACHi", "Ok");
         // Parse power status
@@ -259,7 +262,7 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
 void ACHi::schedule_write_changes() {
   this->write_changes_ = true;
   this->lock_update_ = true;
-  this->last_write_time_ = millis();
+  //this->last_write_time_ = millis();
   this->pending_write_ = true;
 }
 
@@ -332,6 +335,7 @@ void ACHi::write_changes() {
 
   // Send the command
   this->write_array(this->bytearray_);
+  this->last_write_time_ = millis();
 
   // Reset write flags
   this->write_changes_ = false;
