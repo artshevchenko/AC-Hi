@@ -138,9 +138,9 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         if (this->current_power_ != power_status) {
           this->current_power_ = power_status;
           //if (this->power_status != nullptr)
-          this->power_status->publish_state(power_status ? "ON" : "OFF");
+          //this->power_status->publish_state(power_status ? "ON" : "OFF");
           //if (this->power_switch != nullptr)
-          this->power_switch->publish_state(power_status);
+          //this->power_switch->publish_state(power_status);
         }
 
         // Parse current wind
@@ -168,9 +168,9 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         if (this->current_ac_mode_ != ac_mode) {
           this->current_ac_mode_ = ac_mode;
           //if (this->sensor_mode != nullptr)
-          this->sensor_mode->publish_state(bytes[18] >> 4);
+          //this->sensor_mode->publish_state(bytes[18] >> 4);
           //if (this->ac_mode_select != nullptr)
-          this->ac_mode_select->publish_state(ac_mode);
+          //this->ac_mode_select->publish_state(ac_mode);
         }
 
         // Parse current set temperature
