@@ -242,6 +242,7 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
             this->swing_left_right_switch->publish_state(swing_lr);
         }
 
+        ESP_LOGD("ACHi", "pending_write_ = true");
         this->pending_write_ = true;
       }
     }
