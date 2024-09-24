@@ -187,8 +187,8 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         }
 
         // Update other sensors
-        if (this->temp_current != nullptr)
-          this->temp_current->publish_state(bytes[20]);
+        //if (this->temp_current != nullptr)
+        this->temp_current->publish_state(bytes[20]);
         if (this->temp_pipe_current != nullptr)
           this->temp_pipe_current->publish_state(bytes[21]);
         if (this->compr_freq_set != nullptr)
