@@ -39,6 +39,10 @@ class ACHi : public PollingComponent, public uart::UARTDevice {
   void set_swing_up_down(bool swing);
   void set_swing_left_right(bool swing);
 
+    // Sensor and other methods
+
+  void set_temp_current_sensor(sensor::Sensor *s) { temp_current = s; }
+
     // Sensors
   sensor::Sensor *sensor_wind;
   sensor::Sensor *sensor_sleep;
