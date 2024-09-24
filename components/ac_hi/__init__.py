@@ -7,7 +7,7 @@ DEPENDENCIES = ['uart']
 AUTO_LOAD = ['sensor', 'text_sensor', 'number', 'select', 'switch', 'climate']
 
 CONF_TEMP_CURRENT = "temp_current"
-CONF_TEMP_CURRENT = "temp_outdoor"
+CONF_TEMP_OUTDOOR = "temp_outdoor"
 
 ac_hi_ns = cg.esphome_ns.namespace('ac_hi')
 ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
