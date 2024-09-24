@@ -42,6 +42,7 @@ class ACHi : public PollingComponent, public uart::UARTDevice {
     // Sensor and other methods
 
   void set_temp_current_sensor(sensor::Sensor *s) { temp_current = s; }
+  void set_temp_outdoor_sensor(sensor::Sensor *s) { temp_outdoor = s; }
 
     // Sensors
   sensor::Sensor *sensor_wind;
