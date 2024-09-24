@@ -10,6 +10,7 @@ CONF_TEMP_CURRENT = "temp_current"
 CONF_TEMP_OUTDOOR = "temp_outdoor"
 CONF_TEMP_OUTDOOR_CONDENSER = "temp_outdoor_condenser"
 CONF_TEMP_PIPE_CURRENT = "temp_pipe_current"
+CONF_TEMP_SET = "temp_set"
 
 ac_hi_ns = cg.esphome_ns.namespace('ac_hi')
 ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
@@ -27,6 +28,9 @@ CONFIG_SCHEMA = cv.Schema({
         sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
     
     cv.Optional(CONF_TEMP_PIPE_CURRENT):
+        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
+
+    cv.Optional(CONF_TEMP_SET):
         sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
 }).extend(uart.UART_DEVICE_SCHEMA)
 
@@ -55,3 +59,8 @@ async def to_code(config):
         conf = config[CONF_TEMP_PIPE_CURRENT]
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_temp_pipe_current_sensor(sens))
+
+    if CONF_TEMP_SET in config:
+        conf = config[CONF_TEMP_SET]
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_temp_set_sensor(sens))
