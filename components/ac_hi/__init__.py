@@ -6,6 +6,7 @@ from esphome.const import *
 DEPENDENCIES = ['uart']
 AUTO_LOAD = ['sensor', 'text_sensor', 'number', 'select', 'switch', 'climate']
 
+CONF_COMPR_FREQ = "compr_freq"
 CONF_TEMP_CURRENT = "temp_current"
 CONF_TEMP_OUTDOOR = "temp_outdoor"
 CONF_TEMP_OUTDOOR_CONDENSER = "temp_outdoor_condenser"
@@ -18,20 +19,23 @@ ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(ACHi),
 
+    cv.Optional(CONF_COMPR_FREQ):
+        sensor.sensor_schema(device_class=DEVICE_CLASS_FREQUENCY,unit_of_measurement=UNIT_HERTZ,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
+
     cv.Optional(CONF_TEMP_CURRENT):
-        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
+        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
 
     cv.Optional(CONF_TEMP_OUTDOOR):
-        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
+        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
 
     cv.Optional(CONF_TEMP_OUTDOOR_CONDENSER):
-        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
+        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
     
     cv.Optional(CONF_TEMP_PIPE_CURRENT):
-        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
+        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
 
     cv.Optional(CONF_TEMP_SET):
-        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=1,state_class=STATE_CLASS_MEASUREMENT).extend(),
+        sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
 }).extend(uart.UART_DEVICE_SCHEMA)
 
 async def to_code(config):
@@ -39,6 +43,11 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID], uart_component)
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
+
+    if CONF_COMPR_FREQ in config:
+        conf = config[CONF_COMPR_FREQ]
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_compr_freq_sensor(sens))
 
     if CONF_TEMP_CURRENT in config:
         conf = config[CONF_TEMP_CURRENT]
