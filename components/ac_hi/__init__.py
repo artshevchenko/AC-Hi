@@ -7,6 +7,7 @@ DEPENDENCIES = ['uart']
 AUTO_LOAD = ['sensor', 'text_sensor', 'number', 'select', 'switch', 'climate']
 
 CONF_COMPR_FREQ = "compr_freq"
+CONF_COMPR_FREQ_SET = "compr_freq_set"
 CONF_TEMP_CURRENT = "temp_current"
 CONF_TEMP_OUTDOOR = "temp_outdoor"
 CONF_TEMP_OUTDOOR_CONDENSER = "temp_outdoor_condenser"
@@ -20,6 +21,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(ACHi),
 
     cv.Optional(CONF_COMPR_FREQ):
+        sensor.sensor_schema(device_class=DEVICE_CLASS_FREQUENCY,unit_of_measurement=UNIT_HERTZ,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
+
+    cv.Optional(CONF_COMPR_FREQ_SET):
         sensor.sensor_schema(device_class=DEVICE_CLASS_FREQUENCY,unit_of_measurement=UNIT_HERTZ,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
 
     cv.Optional(CONF_TEMP_CURRENT):
@@ -48,6 +52,11 @@ async def to_code(config):
         conf = config[CONF_COMPR_FREQ]
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_compr_freq_sensor(sens))
+
+    if CONF_COMPR_FREQ_SET in config:
+        conf = config[CONF_COMPR_FREQ_SET]
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_compr_freq_set_sensor(sens))
 
     if CONF_TEMP_CURRENT in config:
         conf = config[CONF_TEMP_CURRENT]
