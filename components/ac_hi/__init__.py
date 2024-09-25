@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, binary_sensor, text_sensor, uart
+from esphome.components import select, sensor, binary_sensor, text_sensor, uart
 from esphome.const import *
 
 DEPENDENCIES = ['uart']
