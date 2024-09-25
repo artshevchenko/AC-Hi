@@ -14,6 +14,9 @@ CONF_TEMP_OUTDOOR_CONDENSER = "temp_outdoor_condenser"
 CONF_TEMP_PIPE_CURRENT = "temp_pipe_current"
 CONF_TEMP_SET = "temp_set"
 CONF_SENSOR_ECO = "sensor_eco"
+CONF_SENSOR_LED = "sensor_led"
+CONF_SENSOR_MODE = "sensor_mode"
+CONF_POWER_STATUS = "power_status"
 
 ac_hi_ns = cg.esphome_ns.namespace('ac_hi')
 ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
@@ -29,6 +32,15 @@ CONFIG_SCHEMA = cv.Schema({
 
     cv.Optional(CONF_SENSOR_ECO):
         sensor.sensor_schema(accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
+
+    cv.Optional(CONF_SENSOR_LED):
+        sensor.sensor_schema(accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
+    
+    cv.Optional(CONF_SENSOR_MODE):
+        sensor.sensor_schema(accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
+
+    cv.Optional(CONF_POWER_STATUS):
+        sensor.sensor_schema(state_class=STATE_CLASS_NONE).extend(),
 
     cv.Optional(CONF_TEMP_CURRENT):
         sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
@@ -66,6 +78,21 @@ async def to_code(config):
         conf = config[CONF_SENSOR_ECO]
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_sensor_eco_sensor(sens))
+
+    if CONF_SENSOR_LED in config:
+        conf = config[CONF_SENSOR_LED]
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_led_sensor(sens))
+
+    if CONF_SENSOR_MODE in config:
+        conf = config[CONF_SENSOR_MODE]
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_sensor_mode_sensor(sens))
+
+    if CONF_POWER_STATUS in config:
+        conf = config[CONF_POWER_STATUS]
+        sens = await text_sensor.new_text_sensor(conf)
+        cg.add(var.set_power_status_sensor(sens))
 
     if CONF_TEMP_CURRENT in config:
         conf = config[CONF_TEMP_CURRENT]

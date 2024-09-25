@@ -49,6 +49,9 @@ class ACHi : public PollingComponent, public uart::UARTDevice {
   void set_temp_pipe_current_sensor(sensor::Sensor *s) { temp_pipe_current = s; }
   void set_temp_set_sensor(sensor::Sensor *s) { temp_set = s; }
   void set_sensor_eco_sensor(sensor::Sensor *s) { sensor_eco = s; }
+  void set_sensor_led_sensor(sensor::Sensor *s) { sensor_led = s; }
+  void set_sensor_mode_sensor(sensor::Sensor *s) { sensor_mode = s; }
+  void set_power_status_sensor(text_sensor::TextSensor *s) { power_status = s; }
 
     // Sensors
   sensor::Sensor *sensor_wind;
