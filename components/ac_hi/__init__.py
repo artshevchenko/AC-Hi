@@ -6,6 +6,8 @@ from esphome.const import *
 DEPENDENCIES = ['uart']
 AUTO_LOAD = ['sensor', 'text_sensor', 'number', 'select', 'switch', 'climate']
 
+CONF_AC_MODE_SELECT = "ac_mode_select"
+
 CONF_COMPR_FREQ = "compr_freq"
 CONF_COMPR_FREQ_SET = "compr_freq_set"
 CONF_TEMP_CURRENT = "temp_current"
@@ -23,6 +25,10 @@ ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(ACHi),
+
+    cv.Optional(CONF_AC_MODE_SELECT): select.select_schema(
+        options=["fan_only", "heat", "cool", "dry", "auto"]
+    ).extend(),
 
     cv.Optional(CONF_COMPR_FREQ):
         sensor.sensor_schema(device_class=DEVICE_CLASS_FREQUENCY,unit_of_measurement=UNIT_HERTZ,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
@@ -63,6 +69,12 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID], uart_component)
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
+
+    if CONF_AC_MODE_SELECT in config:
+        conf = config[CONF_AC_MODE_SELECT]
+        sel = await select.new_select(conf)
+        cg.add(var.set_mode_select(sel))
+
 
     if CONF_COMPR_FREQ in config:
         conf = config[CONF_COMPR_FREQ]
