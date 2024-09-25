@@ -141,10 +141,10 @@ void ACHi::process_incoming_data(const std::vector<uint8_t> &bytes) {
         bool power_status = (bytes[18] & 0x08) != 0;
         if (this->current_power_ != power_status) {
           this->current_power_ = power_status;
-          //if (this->power_status != nullptr)
-          //this->power_status->publish_state(power_status ? "ON" : "OFF");
-          //if (this->power_switch != nullptr)
-          //this->power_switch->publish_state(power_status);
+          if (this->power_status != nullptr)
+            this->power_status->publish_state(power_status ? "ON" : "OFF");
+          if (this->power_switch != nullptr)
+            this->power_switch->publish_state(power_status);
         }
 
         // Parse current wind
