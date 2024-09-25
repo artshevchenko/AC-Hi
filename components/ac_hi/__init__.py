@@ -40,7 +40,7 @@ CONFIG_SCHEMA = cv.Schema({
         sensor.sensor_schema(accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
 
     cv.Optional(CONF_POWER_STATUS):
-        sensor.sensor_schema(state_class=STATE_CLASS_NONE).extend(),
+        text_sensor.text_sensor_schema().extend(),
 
     cv.Optional(CONF_TEMP_CURRENT):
         sensor.sensor_schema(device_class=DEVICE_CLASS_TEMPERATURE,unit_of_measurement=UNIT_CELSIUS,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
