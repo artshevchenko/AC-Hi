@@ -70,14 +70,7 @@ async def to_code(config):
 
     if CONF_AC_MODE_SELECT in config:
         conf = config[CONF_AC_MODE_SELECT]
-        sel = await select.new_select(conf)
-
-        sel.add_option("fan_only")
-        sel.add_option("heat")
-        sel.add_option("cool")
-        sel.add_option("dry")
-        sel.add_option("auto")
-        
+        sel = await select.new_select(conf, options=["fan_only", "heat", "cool", "dry", "auto"])
         cg.add(var.set_mode_select(sel))
 
 
