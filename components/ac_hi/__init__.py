@@ -26,9 +26,7 @@ ACHi = ac_hi_ns.class_('ACHi', cg.PollingComponent, uart.UARTDevice)
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(ACHi),
 
-    cv.Optional(CONF_AC_MODE_SELECT): select.select_schema(
-        options=["fan_only", "heat", "cool", "dry", "auto"]
-    ).extend(),
+    cv.Optional(CONF_AC_MODE_SELECT): select.select_schema().extend(),
 
     cv.Optional(CONF_COMPR_FREQ):
         sensor.sensor_schema(device_class=DEVICE_CLASS_FREQUENCY,unit_of_measurement=UNIT_HERTZ,accuracy_decimals=0,state_class=STATE_CLASS_MEASUREMENT).extend(),
@@ -73,6 +71,13 @@ async def to_code(config):
     if CONF_AC_MODE_SELECT in config:
         conf = config[CONF_AC_MODE_SELECT]
         sel = await select.new_select(conf)
+
+        sel.add_option("fan_only")
+        sel.add_option("heat")
+        sel.add_option("cool")
+        sel.add_option("dry")
+        sel.add_option("auto")
+        
         cg.add(var.set_mode_select(sel))
 
 
