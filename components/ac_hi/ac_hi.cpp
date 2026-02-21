@@ -411,10 +411,28 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   last_status_frame_.assign(b.begin(), b.end());
 
   // Ensure we have all expected bytes
-  if (b.size() < 46) {
+  if (b.size() < 50) {
     ESP_LOGE(TAG, "Status frame too short (%u), cannot parse fully", (unsigned) b.size());
     return;
   }
+  
+  // Debug: log full frame for analysis
+  ESP_LOGV(TAG, "Full status frame (%u bytes):", (unsigned)b.size());
+  for (size_t i = 0; i < b.size(); i += 16) {
+    char line[96];
+    char *p = line;
+    size_t chunk = std::min(b.size() - i, size_t(16));
+    for (size_t j = 0; j < chunk; j++) {
+      p += snprintf(p, sizeof(line) - (p - line), "%02X ", b[i + j]);
+    }
+    ESP_LOGV(TAG, "  [%03u] %s", (unsigned)i, line);
+  }
+
+  // Debug: log temperature bytes for analysis
+  ESP_LOGD(TAG, "Temp bytes: set=%u current=%u pipe=%u outdoor[44]=0x%02X(%d) outdoor[45]=0x%02X(%d)",
+           (unsigned)b[IDX_SET_TEMP], (unsigned)b[IDX_CURRENT_TEMP], (unsigned)b[IDX_PIPE_TEMP],
+           (unsigned)b[44], (int)((int8_t)b[44]),
+           (unsigned)b[45], (int)((int8_t)b[45]));
 
   // Power
   power_on_ = (b[IDX_POWER_MODE] & POWER_MASK) != 0;
@@ -497,10 +515,14 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   // Outdoor temperatures are signed!
   if (outdoor_temp_sensor_ != nullptr) {
     int8_t t = static_cast<int8_t>(b[IDX_OUTDOOR_TEMP]);
+    ESP_LOGD(TAG, "Outdoor temp raw=0x%02X signed=%d", 
+             (unsigned)b[IDX_OUTDOOR_TEMP], (int)t);
     outdoor_temp_sensor_->publish_state(static_cast<float>(t));
   }
   if (outdoor_cond_temp_sensor_ != nullptr) {
     int8_t t = static_cast<int8_t>(b[IDX_OUTDOOR_COND_TEMP]);
+    ESP_LOGD(TAG, "Outdoor condenser temp raw=0x%02X signed=%d", 
+             (unsigned)b[IDX_OUTDOOR_COND_TEMP], (int)t);
     outdoor_cond_temp_sensor_->publish_state(static_cast<float>(t));
   }
 #endif
