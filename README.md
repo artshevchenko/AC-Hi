@@ -206,6 +206,44 @@ climate:
       unit_of_measurement: "B"
       device_class: data_size
       state_class: measurement
+
+    # --- RX diagnostics (debug) ---
+    rx_bytes_total:
+      name: "RX Bytes Total"
+      unit_of_measurement: "B"
+      device_class: data_size
+      state_class: total_increasing
+      icon: "mdi:download"
+
+    rx_frames_valid:
+      name: "RX Frames Valid"
+      accuracy_decimals: 0
+      state_class: total_increasing
+      icon: "mdi:check-circle"
+
+    rx_frames_invalid_crc:
+      name: "RX Frames Invalid CRC"
+      accuracy_decimals: 0
+      state_class: total_increasing
+      icon: "mdi:alert-circle"
+
+    rx_frames_too_short:
+      name: "RX Frames Too Short"
+      accuracy_decimals: 0
+      state_class: total_increasing
+      icon: "mdi:arrow-collapse"
+
+    rx_compact_count:
+      name: "RX Buffer Compactions"
+      accuracy_decimals: 0
+      state_class: total_increasing
+      icon: "mdi:swap-horizontal"
+
+    rx_header_resync_count:
+      name: "RX Header Resyncs"
+      accuracy_decimals: 0
+      state_class: total_increasing
+      icon: "mdi:sync-alert"
 ```
 
 ## Entities provided
@@ -241,6 +279,19 @@ Most sensors publish raw values received from the AC:
 | `compressor_frequency_set` | Target compressor frequency (Hz) |
 | `compressor_frequency` | Actual compressor frequency (Hz) |
 | `power_status` | Text sensor showing "ON" or "OFF" |
+
+### Debug sensors (optional, for troubleshooting)
+
+These sensors help diagnose communication issues and buffer problems:
+
+| Sensor | Description |
+| --- | --- |
+| `rx_bytes_total` | Total bytes received on UART |
+| `rx_frames_valid` | Number of valid frames parsed |
+| `rx_frames_invalid_crc` | Frames with CRC errors (indicates noise/baud issues) |
+| `rx_frames_too_short` | Frames too short to be valid |
+| `rx_compact_count` | RX buffer compaction events (high = heavy traffic) |
+| `rx_header_resync_count` | Header resync events (high = corrupted data) |
 
 ### Switches (optional)
 

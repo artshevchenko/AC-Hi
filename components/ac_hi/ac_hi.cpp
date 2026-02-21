@@ -82,22 +82,24 @@ void ACHIClimate::update() {
 }
 
 void ACHIClimate::loop() {
-  // 1. Accumulate incoming bytes
+  // 1. Accumulate incoming bytes with statistics
   uint8_t c;
   while (read_byte(&c)) {
     rx_.push_back(c);
+    rx_bytes_total_++;
   }
 
-  // 2. Compact RX buffer if too much data has been consumed
+  // 2. Compact RX buffer more aggressively to prevent fragmentation
   if (rx_start_ > RX_COMPACT_THRESHOLD) {
-    ESP_LOGV(TAG, "Compacting RX buffer: removing %u bytes", (unsigned) rx_start_);
+    ESP_LOGV(TAG, "Compacting RX buffer: removing %u bytes (count: %lu)", 
+             (unsigned) rx_start_, (unsigned long)++rx_compact_count_);
     rx_.erase(rx_.begin(), rx_.begin() + static_cast<std::ptrdiff_t>(rx_start_));
     rx_start_ = 0;
   }
 
-  // 3. Prevent RX buffer from growing indefinitely
-  if (rx_.size() - rx_start_ > 4096) {
-    ESP_LOGW(TAG, "RX buffer overflow, clearing");
+  // 3. Prevent RX buffer from growing indefinitely - more aggressive cleanup
+  if (rx_.size() - rx_start_ > 2048) {
+    ESP_LOGW(TAG, "RX buffer overflow (%u bytes), clearing", (unsigned)(rx_.size() - rx_start_));
     rx_.clear();
     rx_start_ = 0;
   }
@@ -120,6 +122,9 @@ void ACHIClimate::loop() {
 
   // 7. Optional memory diagnostics
   publish_memory_diagnostics_();
+  
+  // 8. RX diagnostics (less frequent)
+  publish_rx_diagnostics_();
 }
 
 // ---- Climate traits ----
@@ -316,10 +321,13 @@ void ACHIClimate::try_parse_frames_from_buffer_(uint32_t budget_ms) {
 
     uint16_t sum = 0;
     if (!validate_crc_(frame, &sum)) {
-      ESP_LOGW(TAG, "CRC mismatch, ignoring frame");
+      rx_frames_invalid_crc_++;
+      ESP_LOGW(TAG, "CRC mismatch, ignoring frame (count: %lu)", 
+               (unsigned long)rx_frames_invalid_crc_);
       continue;                     // drop invalid frame
     }
 
+    rx_frames_valid_++;
     handle_frame_(frame);
     handled++;
     last_status_crc_ = sum;
@@ -347,6 +355,11 @@ bool ACHIClimate::extract_next_frame_(std::vector<uint8_t> &frame) {
       rx_.push_back(keep);
       rx_start_ = 0;
     } else {
+      if (rx_.size() - rx_start_ > 10) {
+        rx_header_resync_count_++;
+        ESP_LOGV(TAG, "Header resync: discarded %u bytes (count: %lu)", 
+                 (unsigned)(rx_.size() - rx_start_), (unsigned long)rx_header_resync_count_);
+      }
       rx_.clear();
       rx_start_ = 0;
     }
@@ -379,7 +392,9 @@ bool ACHIClimate::extract_next_frame_(std::vector<uint8_t> &frame) {
 
 void ACHIClimate::handle_frame_(const std::vector<uint8_t> &b) {
   if (b.size() < 20) {
-    ESP_LOGD(TAG, "Frame too short (%u), ignored", (unsigned) b.size());
+    rx_frames_too_short_++;
+    ESP_LOGD(TAG, "Frame too short (%u), ignored (count: %lu)", 
+             (unsigned) b.size(), (unsigned long)rx_frames_too_short_);
     return;
   }
   uint8_t cmd = b[IDX_CMD];
@@ -726,6 +741,34 @@ void ACHIClimate::publish_memory_diagnostics_() {
   if (psram_total_sensor_ != nullptr && psram_total > 0) psram_total_sensor_->publish_state(static_cast<float>(psram_total));
   if (psram_free_sensor_ != nullptr && psram_free > 0) psram_free_sensor_->publish_state(static_cast<float>(psram_free));
 #endif
+}
+
+// ---- RX diagnostics ----
+void ACHIClimate::publish_rx_diagnostics_() {
+#ifdef USE_SENSOR
+  static uint32_t last_ms = 0;
+  uint32_t now = millis();
+  // Publish RX diagnostics every 10 seconds
+  if (now - last_ms < 10000) return;
+  last_ms = now;
+
+  if (rx_bytes_total_sensor_ != nullptr) rx_bytes_total_sensor_->publish_state(static_cast<float>(rx_bytes_total_));
+  if (rx_frames_valid_sensor_ != nullptr) rx_frames_valid_sensor_->publish_state(static_cast<float>(rx_frames_valid_));
+  if (rx_frames_invalid_crc_sensor_ != nullptr) rx_frames_invalid_crc_sensor_->publish_state(static_cast<float>(rx_frames_invalid_crc_));
+  if (rx_frames_too_short_sensor_ != nullptr) rx_frames_too_short_sensor_->publish_state(static_cast<float>(rx_frames_too_short_));
+  if (rx_compact_count_sensor_ != nullptr) rx_compact_count_sensor_->publish_state(static_cast<float>(rx_compact_count_));
+  if (rx_header_resync_count_sensor_ != nullptr) rx_header_resync_count_sensor_->publish_state(static_cast<float>(rx_header_resync_count_));
+#endif
+}
+
+void ACHIClimate::reset_rx_stats() {
+  rx_bytes_total_ = 0;
+  rx_frames_valid_ = 0;
+  rx_frames_invalid_crc_ = 0;
+  rx_frames_too_short_ = 0;
+  rx_compact_count_ = 0;
+  rx_header_resync_count_ = 0;
+  ESP_LOGI(TAG, "RX statistics reset");
 }
 
 }  // namespace ac_hi

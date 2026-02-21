@@ -89,8 +89,8 @@ namespace TxValues {
 // Limits for non‑blocking operation
 static constexpr uint8_t  MAX_FRAMES_PER_LOOP = 2;
 static constexpr uint32_t MAX_PARSE_TIME_MS   = 20;
-static constexpr size_t   RX_COMPACT_THRESHOLD = 512;
-static constexpr size_t   RX_BUFFER_RESERVE    = 2048;
+static constexpr size_t   RX_COMPACT_THRESHOLD = 128;   // более агрессивная компактификация
+static constexpr size_t   RX_BUFFER_RESERVE    = 4096;  // увеличен для предотвращения аллокаций
 static constexpr size_t   MAX_FRAME_BYTES      = 96;
 static constexpr uint32_t WRITE_LOCK_TIMEOUT   = 5000;   // ms
 static constexpr uint32_t CONTROL_DEBOUNCE_MS  = 200;    // ms
@@ -133,6 +133,13 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   void set_heap_fragmentation_sensor(sensor::Sensor *s) { heap_fragmentation_sensor_ = s; }
   void set_psram_total_sensor(sensor::Sensor *s) { psram_total_sensor_ = s; }
   void set_psram_free_sensor(sensor::Sensor *s) { psram_free_sensor_ = s; }
+  // RX diagnostics
+  void set_rx_bytes_total_sensor(sensor::Sensor *s) { rx_bytes_total_sensor_ = s; }
+  void set_rx_frames_valid_sensor(sensor::Sensor *s) { rx_frames_valid_sensor_ = s; }
+  void set_rx_frames_invalid_crc_sensor(sensor::Sensor *s) { rx_frames_invalid_crc_sensor_ = s; }
+  void set_rx_frames_too_short_sensor(sensor::Sensor *s) { rx_frames_too_short_sensor_ = s; }
+  void set_rx_compact_count_sensor(sensor::Sensor *s) { rx_compact_count_sensor_ = s; }
+  void set_rx_header_resync_count_sensor(sensor::Sensor *s) { rx_header_resync_count_sensor_ = s; }
 #endif
 
 #ifdef USE_TEXT_SENSOR
@@ -181,6 +188,8 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
 
   // Diagnostics
   void publish_memory_diagnostics_();
+  void publish_rx_diagnostics_();
+  void reset_rx_stats();
 
   // Field encoders (TX)
   uint8_t encode_temp_(uint8_t c) {
@@ -270,6 +279,14 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   // Last CRC for suppression (optional)
   uint16_t last_status_crc_{0};
 
+  // Debug counters for RX diagnostics
+  uint32_t rx_bytes_total_{0};
+  uint32_t rx_frames_valid_{0};
+  uint32_t rx_frames_invalid_crc_{0};
+  uint32_t rx_frames_too_short_{0};
+  uint32_t rx_compact_count_{0};
+  uint32_t rx_header_resync_count_{0};
+
   // Optional sensors and switches
 #ifdef USE_SENSOR
   sensor::Sensor *pipe_sensor_{nullptr};
@@ -296,6 +313,13 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   sensor::Sensor *heap_fragmentation_sensor_{nullptr};
   sensor::Sensor *psram_total_sensor_{nullptr};
   sensor::Sensor *psram_free_sensor_{nullptr};
+  // RX diagnostics
+  sensor::Sensor *rx_bytes_total_sensor_{nullptr};
+  sensor::Sensor *rx_frames_valid_sensor_{nullptr};
+  sensor::Sensor *rx_frames_invalid_crc_sensor_{nullptr};
+  sensor::Sensor *rx_frames_too_short_sensor_{nullptr};
+  sensor::Sensor *rx_compact_count_sensor_{nullptr};
+  sensor::Sensor *rx_header_resync_count_sensor_{nullptr};
 #endif
 #ifdef USE_TEXT_SENSOR
   text_sensor::TextSensor *power_status_text_{nullptr};
