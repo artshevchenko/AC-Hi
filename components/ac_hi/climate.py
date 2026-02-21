@@ -40,6 +40,14 @@ CONF_HEAP_FRAGMENTATION = "heap_fragmentation"
 CONF_PSRAM_TOTAL = "psram_total"
 CONF_PSRAM_FREE = "psram_free"
 
+# RX diagnostics sensor keys
+CONF_RX_BYTES_TOTAL = "rx_bytes_total"
+CONF_RX_FRAMES_VALID = "rx_frames_valid"
+CONF_RX_FRAMES_INVALID_CRC = "rx_frames_invalid_crc"
+CONF_RX_FRAMES_TOO_SHORT = "rx_frames_too_short"
+CONF_RX_COMPACT_COUNT = "rx_compact_count"
+CONF_RX_HEADER_RESYNC_COUNT = "rx_header_resync_count"
+
 CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend({
     cv.GenerateID(): cv.declare_id(ACHIClimate),
     cv.Optional(CONF_ENABLE_PRESETS, default=True): cv.boolean,
@@ -79,6 +87,14 @@ CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend({
     cv.Optional(CONF_HEAP_FRAGMENTATION): sensor.sensor_schema(),
     cv.Optional(CONF_PSRAM_TOTAL): sensor.sensor_schema(),
     cv.Optional(CONF_PSRAM_FREE): sensor.sensor_schema(),
+
+    # RX diagnostics sensors (all optional)
+    cv.Optional(CONF_RX_BYTES_TOTAL): sensor.sensor_schema(),
+    cv.Optional(CONF_RX_FRAMES_VALID): sensor.sensor_schema(),
+    cv.Optional(CONF_RX_FRAMES_INVALID_CRC): sensor.sensor_schema(),
+    cv.Optional(CONF_RX_FRAMES_TOO_SHORT): sensor.sensor_schema(),
+    cv.Optional(CONF_RX_COMPACT_COUNT): sensor.sensor_schema(),
+    cv.Optional(CONF_RX_HEADER_RESYNC_COUNT): sensor.sensor_schema(),
 
 }).extend(uart.UART_DEVICE_SCHEMA).extend(cv.polling_component_schema("1s"))
 
@@ -196,3 +212,28 @@ async def to_code(config):
     if conf := config.get(CONF_PSRAM_FREE):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_psram_free_sensor(sens))
+
+    # RX diagnostics sensors (optional)
+    if conf := config.get(CONF_RX_BYTES_TOTAL):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_rx_bytes_total_sensor(sens))
+
+    if conf := config.get(CONF_RX_FRAMES_VALID):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_rx_frames_valid_sensor(sens))
+
+    if conf := config.get(CONF_RX_FRAMES_INVALID_CRC):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_rx_frames_invalid_crc_sensor(sens))
+
+    if conf := config.get(CONF_RX_FRAMES_TOO_SHORT):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_rx_frames_too_short_sensor(sens))
+
+    if conf := config.get(CONF_RX_COMPACT_COUNT):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_rx_compact_count_sensor(sens))
+
+    if conf := config.get(CONF_RX_HEADER_RESYNC_COUNT):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_rx_header_resync_count_sensor(sens))
